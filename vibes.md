@@ -1,0 +1,28 @@
+## Project Vibe
+
+- This project is a tldraw agent starter where model-provider setup should feel simple and swappable.
+- For Gemini in this repo, the practical mental model is: "Google provider key goes in `.dev.vars` as `GOOGLE_API_KEY`."
+- Keep answers to setup questions concrete and repo-specific so onboarding feels easy.
+- Cerebrus should keep feeling editorial and calm even when richer embeds show up. New blocks should stay soft, readable, and lightly framed rather than looking like heavy app widgets.
+- Cerebrus should keep feeling like a calm, structured document system, even when it grows richer primitives like charts. Data visuals should read like part of the page, not like embedded dashboard widgets.
+- Cerebrus is not just a page generator anymore; it wants to become a canvas-native UI substrate where artifacts live in the same spatial reality as tldraw.
+- The product direction is one generic Cerebrus shape on canvas. `Page` is one root-capable artifact, not the only one. Document primitives stay Page-only, while richer surface components should be able to stand alone or live inside a Page.
+- Preserve the feeling that generated UI is authored, placed, persistent, and first-class on the canvas. Avoid sidecar-preview thinking when adding future Cerebrus capabilities.
+- Cerebrus pages should feel directly manipulable on the canvas: when someone chooses to edit a page, embeds should behave like real embeds and text should feel selectable and editable instead of frozen preview output.
+- Cerebrus is also moving toward an orchestration system where agents can break big structured work into spatially organized child jobs. The user wants course-map-like layouts on the canvas, with higher-level units flowing left to right and lower-level lessons/tests stacking vertically inside each unit.
+- The orchestration vibe should still feel simple from the outside: one prompt can fan out into many Cerebrus artifacts, but the result should look legible and authored rather than like a chaotic swarm of AI output.
+- For learning content specifically, the user wants lesson and test pages to feel like elegant worksheet forms, not generic docs. The new form primitives should stay in the same calm editorial family as Page/Section/Paragraph instead of turning into heavy app UI.
+- The user does not want the canvas to show every generated document at full fidelity all the time. Cerebrus now needs a map-vs-document distinction: summary-first map nodes on canvas, then a focused document view when opening one.
+- Breadcrumbs, outline navigation, and explicit parent/child metadata matter more than pure spatial placement. The canvas is still the world, but hierarchy should be durable and legible even after refresh or manual repositioning.
+- The user wants the hierarchy to feel like Finder or Drive, not like a graph with a modal focus state. The left outline should act like the primary navigator and the canvas should behave like the currently opened folder.
+- Folder artifacts should read as containers and file artifacts should read as files. Course/unit cards should feel structural, while lesson/test/practice items should feel compact and document-adjacent instead of like full mini-pages.
+- Opening a lesson or test should replace the main canvas stage with the full document, while Back should always feel like moving up the folder hierarchy rather than dismissing an overlay.
+- The user wants generated learning content to feel ambitious and complete, not lazy. Lessons, modules, and courses should default toward richer structure, multiple examples, practice, references, and sensible next steps rather than minimal one-example pages.
+- The user is now probing whether the main bottom chat agent should be able to drive dashboard rendering directly. Product-wise, that likely means eventually bridging the default agent into Cerebrus operations, but still through a safe typed UI spec layer instead of arbitrary runtime React execution.
+- The user now wants a second lane for true deliverables: artifacts like slideshows, web designs, and React component previews should feel like produced work objects, not regular app chrome. The shell can be consistent, but the inner artifact body should be able to run live code in an isolated preview runtime.
+- The artifact lane should be explicit and agent-owned. The user does not want cheesy keyword heuristics in the dock silently rerouting prompts; artifact spawning should feel like a deliberate handoff by the main agent, with model choice passed intentionally instead of buried in the worker.
+- In Cerebrus document view, embeds need to feel usable like real embeds. If a document is open, there should be an obvious way to enter an interaction mode so iframe/video surfaces are not stuck as dead previews.
+- Board-level embeds should stay visually crisp before interaction. Soft editorial framing is welcome, but canvas emphasis states should not scale live iframe content in a way that makes embeds look blurry until clicked.
+- The bottom bar should now be the real main-agent surface, not a fake Cerebrus shortcut. Keeping the dock compact matters, but under the hood it should share the same agent history, model state, and action system as the rest of the app.
+- The user wants explicit model-chosen delegation instead of app routing guesses. The main agent should decide between artifact, Cerebrus, orchestration, or direct canvas edits, and ambiguous homepage/landing-page style requests should lean artifact-first by default.
+- The dock needs to feel sturdy even when the agent is booting or the model emits partial tool calls. A compact primary surface is only trustworthy if missing action fields degrade gracefully instead of white-screening the app.
