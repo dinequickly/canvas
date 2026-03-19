@@ -11,12 +11,14 @@ import { readCerebrusShapes } from './readCerebrusPageShapes'
 export type CerebrusResponse = {
 	operations?: CerebrusOperationBatch['operations']
 	modelName?: string
+	usedSkills?: string[]
 	error?: string
 }
 
 export type SuccessfulCerebrusResponse = {
 	operations: CerebrusOperationBatch['operations']
 	modelName?: string
+	usedSkills: string[]
 }
 
 export async function fetchCerebrusOperations(
@@ -57,6 +59,7 @@ export async function fetchCerebrusOperations(
 	return {
 		operations: data.operations,
 		modelName: data.modelName,
+		usedSkills: data.usedSkills ?? [],
 	}
 }
 

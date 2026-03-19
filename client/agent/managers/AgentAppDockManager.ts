@@ -10,6 +10,7 @@ export type DockHandoffSummary =
 			type: 'cerebrus'
 			modelName: string
 			operations: CerebrusOperationBatch['operations']
+			usedSkills: string[]
 	  }
 	| {
 			type: 'artifact'
@@ -118,7 +119,10 @@ export class AgentAppDockManager extends BaseAgentAppManager {
 		})
 	}
 
-	recordCerebrusResult(requestId: string, result: { modelName: string; operations: CerebrusOperationBatch['operations'] }) {
+	recordCerebrusResult(
+		requestId: string,
+		result: { modelName: string; operations: CerebrusOperationBatch['operations']; usedSkills?: string[] }
+	) {
 		this.updateState((state) => {
 			if (state.requestId !== requestId || state.status === 'cancelled') return state
 			return {
@@ -128,6 +132,7 @@ export class AgentAppDockManager extends BaseAgentAppManager {
 					type: 'cerebrus',
 					modelName: result.modelName,
 					operations: result.operations,
+					usedSkills: result.usedSkills ?? [],
 				},
 			}
 		})

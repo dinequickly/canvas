@@ -1,9 +1,15 @@
 import { AnthropicProvider, createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI, GoogleGenerativeAIProvider } from '@ai-sdk/google'
 import { createOpenAI, OpenAIProvider } from '@ai-sdk/openai'
-import { LanguageModel, ModelMessage, streamText } from 'ai'
+import { generateObject, LanguageModel, ModelMessage, streamText } from 'ai'
 import { AgentModelName, getAgentModelDefinition, isValidModelName } from '../../shared/models'
-import { DebugPart } from '../../shared/schema/PromptPartDefinitions'
+import {
+	ChatHistoryPart,
+	ContextItemsPart,
+	DebugPart,
+	MessagesPart,
+	SelectedShapesPart,
+} from '../../shared/schema/PromptPartDefinitions'
 import { AgentAction } from '../../shared/types/AgentAction'
 import { AgentPrompt } from '../../shared/types/AgentPrompt'
 import { Streaming } from '../../shared/types/Streaming'
@@ -12,6 +18,96 @@ import { buildMessages } from '../prompt/buildMessages'
 import { buildSystemPrompt } from '../prompt/buildSystemPrompt'
 import { getModelName } from '../prompt/getModelName'
 import { closeAndParseJson } from './closeAndParseJson'
+import { getSkillBundle, getSkillMenu, listSkills, type SkillBundle } from '../../src/lib/skills/registry'
+import { z } from 'zod'
+
+const agentSkillSelectionSchema = z.object({
+	skillId: z.string().nullable(),
+	reason: z.string().min(1),
+})
+
+function getProviderOptions(
+	provider: LanguageModel['provider'],
+	modelDefinition: ReturnType<typeof getAgentModelDefinition>
+) {
+	const geminiThinkingBudget = modelDefinition.thinking ? 256 : 0
+	const openaiReasoningEffort = provider === 'openai.responses' ? 'none' : 'minimal'
+
+	return {
+		anthropic: {
+			thinking: { type: 'disabled' as const },
+		},
+		google: {
+			thinkingConfig: { thinkingBudget: geminiThinkingBudget },
+		},
+		openai: {
+			reasoningEffort: openaiReasoningEffort,
+		},
+	}
+}
+
+function truncateText(value: string, maxLength = 700) {
+	if (value.length <= maxLength) return value
+	return `${value.slice(0, maxLength - 1)}…`
+}
+
+function buildRecentHistorySummary(historyPart?: ChatHistoryPart) {
+	const promptItems = historyPart?.history.filter((item) => item.type === 'prompt').slice(-4) ?? []
+	if (promptItems.length === 0) return 'None'
+
+	return promptItems
+		.map((item, index) => `${index + 1}. ${item.promptSource}: ${truncateText(item.agentFacingMessage, 240)}`)
+		.join('\n')
+}
+
+function buildContextSummary(contextPart?: ContextItemsPart) {
+	const items = contextPart?.items ?? []
+	if (items.length === 0) return 'None'
+
+	return items
+		.slice(0, 6)
+		.map((item, index) => `${index + 1}. ${truncateText(JSON.stringify(item), 260)}`)
+		.join('\n')
+}
+
+function buildSelectedShapeSummary(selectedShapesPart?: SelectedShapesPart) {
+	const shapeIds = selectedShapesPart?.shapeIds ?? []
+	if (shapeIds.length === 0) return 'None'
+	return shapeIds.join(', ')
+}
+
+function buildSkillSelectionPrompt(prompt: AgentPrompt) {
+	const messagesPart = prompt.messages as MessagesPart | undefined
+	const chatHistoryPart = prompt.chatHistory as ChatHistoryPart | undefined
+	const contextItemsPart = prompt.contextItems as ContextItemsPart | undefined
+	const selectedShapesPart = prompt.selectedShapes as SelectedShapesPart | undefined
+	const latestRequest = messagesPart?.agentMessages.at(-1)?.trim() ?? ''
+
+	if (!latestRequest) return ''
+
+	return `Current request:
+${latestRequest}
+
+Recent prompt history:
+${buildRecentHistorySummary(chatHistoryPart)}
+
+Context items:
+${buildContextSummary(contextItemsPart)}
+
+Selected shapes:
+${buildSelectedShapeSummary(selectedShapesPart)}`
+}
+
+function buildLoadedSkillSystemPrompt(skillBundle: SkillBundle) {
+	return `A bundled domain skill has been loaded for this request.
+
+Skill id: ${skillBundle.manifest.id}
+Skill name: ${skillBundle.manifest.name}
+
+Use the following guidance when it helps, while still obeying the base system prompt and action schema:
+
+${skillBundle.content}`
+}
 
 export class AgentService {
 	openai: OpenAIProvider
@@ -56,6 +152,7 @@ export class AgentService {
 
 		const modelDefinition = getAgentModelDefinition(modelId)
 		const systemPrompt = buildSystemPrompt(prompt)
+		const selectedSkill = await this.selectBundledSkill(model, modelDefinition, prompt)
 
 		// Build messages with provider-specific options
 		const messages: ModelMessage[] = []
@@ -75,6 +172,13 @@ export class AgentService {
 			messages.push({
 				role: 'system',
 				content: systemPrompt,
+			})
+		}
+
+		if (selectedSkill) {
+			messages.push({
+				role: 'system',
+				content: buildLoadedSkillSystemPrompt(selectedSkill),
 			})
 		}
 
@@ -100,30 +204,13 @@ export class AgentService {
 			content: '{"actions": [{"_type":',
 		})
 
-		// Configure thinking budgets based on model. We let models think using the think action, so we keep this as low as possible to minimize time to first token
-		// Gemini: 256 for thinking models, 0 otherwise
-		const geminiThinkingBudget = modelDefinition.thinking ? 256 : 0
-
-		// OpenAI: 'none' for non-reasoning models, 'minimal' otherwise
-		const openaiReasoningEffort = provider === 'openai.responses' ? 'none' : 'minimal'
-
 		try {
 			const { textStream } = streamText({
 				model,
 				messages,
 				maxOutputTokens: 8192,
 				temperature: 0,
-				providerOptions: {
-					anthropic: {
-						thinking: { type: 'disabled' },
-					},
-					google: {
-						thinkingConfig: { thinkingBudget: geminiThinkingBudget },
-					},
-					openai: {
-						reasoningEffort: openaiReasoningEffort,
-					},
-				},
+				providerOptions: getProviderOptions(provider, modelDefinition),
 				onAbort() {
 					console.warn('Stream actions aborted')
 				},
@@ -196,6 +283,43 @@ export class AgentService {
 		} catch (error: any) {
 			console.error('streamActions error:', error)
 			throw error
+		}
+	}
+
+	private async selectBundledSkill(
+		model: LanguageModel,
+		modelDefinition: ReturnType<typeof getAgentModelDefinition>,
+		prompt: AgentPrompt
+	): Promise<SkillBundle | null> {
+		const availableSkills = listSkills('agent')
+		if (availableSkills.length === 0) return null
+
+		const selectionPrompt = buildSkillSelectionPrompt(prompt)
+		if (!selectionPrompt) return null
+
+		try {
+			const result = await generateObject({
+				model,
+				schema: agentSkillSelectionSchema,
+				system: `You decide whether the main canvas agent should load one bundled domain skill before responding.
+
+Choose a skill only if it would materially improve domain-specific strategy or structure.
+Return \`null\` for \`skillId\` when the request is generic canvas work, ordinary layout or editing, or when no listed skill is clearly relevant.
+Do not invent skills. You may choose at most one.
+
+Available skills:
+${getSkillMenu('agent')}`,
+				prompt: selectionPrompt,
+				temperature: 0,
+				maxOutputTokens: 300,
+				providerOptions: getProviderOptions(model.provider, modelDefinition),
+			})
+
+			if (!result.object.skillId) return null
+			return getSkillBundle(result.object.skillId, 'agent')
+		} catch (error) {
+			console.warn('Bundled skill preflight failed:', error)
+			return null
 		}
 	}
 }

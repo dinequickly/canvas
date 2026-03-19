@@ -55,6 +55,7 @@ export function CerebrusDockBar() {
 			created,
 			patched,
 			total: dockState.handoff.operations.length,
+			usedSkills: dockState.handoff.usedSkills,
 			prettyJson: JSON.stringify({ operations: dockState.handoff.operations }, null, 2),
 		}
 	}, [dockState.handoff])
@@ -149,6 +150,9 @@ export function CerebrusDockBar() {
 						{cerebrusSummary ? <span>{cerebrusSummary.total} ops</span> : null}
 						{cerebrusSummary ? <span>{cerebrusSummary.created} create</span> : null}
 						{cerebrusSummary ? <span>{cerebrusSummary.patched} patch</span> : null}
+						{cerebrusSummary && cerebrusSummary.usedSkills.length > 0 ? (
+							<span>{cerebrusSummary.usedSkills.join(', ')}</span>
+						) : null}
 						{orchestrationSummary ? (
 							<span>
 								{orchestrationSummary.finishedChildren}/{orchestrationSummary.childCount} spawned agents
@@ -180,6 +184,13 @@ export function CerebrusDockBar() {
 						<details className="cerebrus-dock-response-json">
 							<summary>View operations</summary>
 							<pre>{cerebrusSummary.prettyJson}</pre>
+						</details>
+					) : null}
+
+					{cerebrusSummary && cerebrusSummary.usedSkills.length > 0 ? (
+						<details className="cerebrus-dock-response-json">
+							<summary>Loaded skills</summary>
+							<pre>{JSON.stringify(cerebrusSummary.usedSkills, null, 2)}</pre>
 						</details>
 					) : null}
 

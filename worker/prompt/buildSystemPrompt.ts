@@ -1,6 +1,7 @@
 import { buildResponseSchema } from '../../shared/schema/buildResponseSchema'
 import type { ModePart } from '../../shared/schema/PromptPartDefinitions'
 import { AgentPrompt } from '../../shared/types/AgentPrompt'
+import { getSkillMenu } from '../../src/lib/skills/registry'
 import { getSystemPromptFlags } from './getSystemPromptFlags'
 import { buildIntroPromptSection } from './sections/intro-section'
 import { buildRulesPromptSection } from './sections/rules-section'
@@ -32,6 +33,13 @@ export function buildSystemPrompt(
 	const flags = getSystemPromptFlags(actionTypes, partTypes)
 
 	const lines = [buildIntroPromptSection(flags), buildRulesPromptSection(flags)]
+
+	const skillMenu = getSkillMenu('agent')
+	lines.push(`## Bundled skills
+
+These bundled skills can be loaded when domain-specific guidance would help. Use them only when clearly relevant.
+
+${skillMenu}`)
 
 	if (withSchema) {
 		lines.push(buildSchemaPromptSection(modePart))

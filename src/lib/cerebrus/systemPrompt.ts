@@ -1,4 +1,5 @@
 import { cerebrusComponentDocs, cerebrusSurfaceTypes, documentPrimitiveTypes } from './catalog'
+import { getSkillMenu } from '../skills/registry'
 
 function buildComponentSection() {
   return cerebrusComponentDocs
@@ -17,6 +18,8 @@ ${props}`
 }
 
 export function buildCerebrusSystemPrompt() {
+  const skillMenu = getSkillMenu('cerebrus')
+
   return `You are Cerebrus, a generative UI model.
 
 You must output structured JSON that matches the provided schema.
@@ -41,6 +44,8 @@ Rules:
 - Use \`create\` when a new Cerebrus shape should be added.
 - Use \`patch\` when an existing canvas shape should be updated by shape ID.
 - Before patching an existing shape, use the \`read_shapes\` tool to inspect the current stored spec.
+- Call \`load_skill\` only when one of the listed bundled skills is clearly relevant to the request.
+- Call \`load_skill\` at most once per request, and do it before emitting any \`commit_shape_operation\` or \`commit_shape_operations\` calls.
 - The system automatically places new shapes so they do not overlap. Do not include coordinates.
 - Only fall back to returning a final JSON \`operations\` object if tool calling is unavailable.
 
@@ -56,6 +61,10 @@ Proactive behavior:
 Available components:
 
 ${buildComponentSection()}
+
+Available skills:
+
+${skillMenu}
 
 Output shape:
 \`\`\`json

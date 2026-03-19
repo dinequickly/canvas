@@ -38,6 +38,7 @@ export class GenerateCerebrusActionUtil extends AgentActionUtil<GenerateCerebrus
 			app.dock.recordCerebrusResult(requestId, {
 				modelName: result.modelName ?? modelName,
 				operations: result.operations,
+				usedSkills: result.usedSkills,
 			})
 		}
 	}

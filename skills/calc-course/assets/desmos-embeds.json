@@ -1,0 +1,34 @@
+{
+  "topics": [
+    {
+      "topic": "limits-intuition",
+      "title": "Limit Intuition Explorer",
+      "url": "https://www.desmos.com/calculator/9xq4n6z3hm",
+      "useCases": [
+        "introducing left-hand and right-hand behavior",
+        "observing removable discontinuities",
+        "discussing approaching versus reaching a point"
+      ]
+    },
+    {
+      "topic": "derivative-tangent-line",
+      "title": "Secant to Tangent Transition",
+      "url": "https://www.desmos.com/calculator/t7v6m4m2ny",
+      "useCases": [
+        "connecting average rate of change to instantaneous rate",
+        "showing secant lines approaching a tangent line",
+        "building intuition before derivative rules"
+      ]
+    },
+    {
+      "topic": "optimization-visualizer",
+      "title": "Optimization Visualizer",
+      "url": "https://www.desmos.com/calculator/m4v6h3qz2a",
+      "useCases": [
+        "testing maxima and minima intuition",
+        "linking critical points to context",
+        "supporting optimization lessons"
+      ]
+    }
+  ]
+}

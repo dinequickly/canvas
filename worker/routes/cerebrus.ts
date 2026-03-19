@@ -10,6 +10,7 @@ import {
 	type CerebrusSpecPatch,
 } from '../../src/lib/cerebrus/operations'
 import { buildCerebrusSystemPrompt } from '../../src/lib/cerebrus/systemPrompt'
+import { getSkillBundle } from '../../src/lib/skills/registry'
 import { DEFAULT_MODEL_NAME, AgentModelName, isValidModelName } from '../../shared/models'
 import { Environment } from '../environment'
 import { AgentService } from '../do/AgentService'
@@ -363,6 +364,7 @@ async function generateCandidate(
 ) {
 	const feedbackSection = feedback ? `\n\nPrevious draft problems:\n${feedback}\n\nReturn a corrected JSON object only.` : ''
 	const emittedOperations: CerebrusOperation[] = []
+	const usedSkills = new Set<string>()
 	const result = await generateText({
 		model,
 		system: buildCerebrusSystemPrompt(),
@@ -378,6 +380,37 @@ async function generateCandidate(
 					const results = ids && ids.length > 0 ? shapes.filter((shape) => ids.includes(shape.shapeId)) : shapes
 					return {
 						shapes: results,
+					}
+				},
+			}),
+			load_skill: tool({
+				description:
+					'Load one bundled domain skill before generating operations. Call this only when a listed skill is clearly relevant.',
+				inputSchema: z.object({
+					skillId: z.string().min(1),
+				}),
+				execute: async ({ skillId }) => {
+					if (usedSkills.size > 0 && !usedSkills.has(skillId)) {
+						return {
+							loaded: false,
+							error: 'Only one bundled skill may be loaded per request.',
+						}
+					}
+
+					try {
+						const bundle = getSkillBundle(skillId, 'cerebrus')
+						usedSkills.add(bundle.manifest.id)
+						return {
+							loaded: true,
+							skillId: bundle.manifest.id,
+							name: bundle.manifest.name,
+							content: bundle.content,
+						}
+					} catch (error) {
+						return {
+							loaded: false,
+							error: error instanceof Error ? error.message : `Unable to load skill "${skillId}".`,
+						}
 					}
 				},
 			}),
@@ -417,6 +450,7 @@ async function generateCandidate(
 	return {
 		text: result.text,
 		operations: emittedOperations,
+		usedSkills: Array.from(usedSkills),
 	}
 }
 
@@ -453,7 +487,7 @@ async function generateValidatedOperationBatch(
 	prompt: string,
 	shapes: z.infer<typeof canvasPageSchema>[],
 	selectedShapeIds: string[]
-): Promise<CerebrusOperationBatch> {
+): Promise<{ batch: CerebrusOperationBatch; usedSkills: string[] }> {
 	const firstDraft = await generateCandidate(model, prompt, shapes, selectedShapeIds)
 	const firstToolBatch =
 		firstDraft.operations.length > 0 ? cerebrusOperationBatchSchema.parse({ operations: firstDraft.operations }) : null
@@ -461,14 +495,20 @@ async function generateValidatedOperationBatch(
 	const firstMergedBatch = mergeOperationBatches(firstToolBatch, firstTextBatch)
 
 	if (firstMergedBatch) {
-		return firstMergedBatch
+		return {
+			batch: firstMergedBatch,
+			usedSkills: firstDraft.usedSkills,
+		}
 	}
 
 	const firstCandidate = normalizeOperationBatchCandidate(extractJsonObject(firstDraft.text))
 	const firstParse = cerebrusOperationBatchSchema.safeParse(firstCandidate)
 
 	if (firstParse.success) {
-		return firstParse.data
+		return {
+			batch: firstParse.data,
+			usedSkills: firstDraft.usedSkills,
+		}
 	}
 
 	const repairFeedback = `${formatZodError(firstParse.error)}\n\nPrevious draft:\n${JSON.stringify(firstCandidate, null, 2)}`
@@ -481,11 +521,17 @@ async function generateValidatedOperationBatch(
 	const repairedMergedBatch = mergeOperationBatches(repairedToolBatch, repairedTextBatch)
 
 	if (repairedMergedBatch) {
-		return repairedMergedBatch
+		return {
+			batch: repairedMergedBatch,
+			usedSkills: repairedDraft.usedSkills.length > 0 ? repairedDraft.usedSkills : firstDraft.usedSkills,
+		}
 	}
 
 	const repairedCandidate = normalizeOperationBatchCandidate(extractJsonObject(repairedDraft.text))
-	return cerebrusOperationBatchSchema.parse(repairedCandidate)
+	return {
+		batch: cerebrusOperationBatchSchema.parse(repairedCandidate),
+		usedSkills: repairedDraft.usedSkills.length > 0 ? repairedDraft.usedSkills : firstDraft.usedSkills,
+	}
 }
 
 export async function cerebrus(request: IRequest, env: Environment) {
@@ -495,11 +541,12 @@ export async function cerebrus(request: IRequest, env: Environment) {
 
 		const service = new AgentService(env)
 		const model = service.getModel(modelName)
-		const batch = await generateValidatedOperationBatch(model, body.prompt, body.shapes, body.selectedShapeIds)
+		const result = await generateValidatedOperationBatch(model, body.prompt, body.shapes, body.selectedShapeIds)
 
 		return Response.json({
-			operations: batch.operations,
+			operations: result.batch.operations,
 			modelName,
+			usedSkills: result.usedSkills,
 		})
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Failed to generate Cerebrus operations.'

@@ -12,6 +12,7 @@ export function CerebrusPlayground() {
 	const [prompt, setPrompt] = useState(defaultPrompt)
 	const [operations, setOperations] = useState<CerebrusOperationBatch['operations'] | null>(null)
 	const [modelName, setModelName] = useState<string | null>(null)
+	const [usedSkills, setUsedSkills] = useState<string[]>([])
 	const [error, setError] = useState<string | null>(null)
 	const [isGenerating, setIsGenerating] = useState(false)
 	const [orchestrationRootId, setOrchestrationRootId] = useState<string | null>(null)
@@ -52,15 +53,18 @@ export function CerebrusPlayground() {
 			if (data.mode === 'orchestration') {
 				setOperations(null)
 				setModelName('cerebrus-orchestrator')
+				setUsedSkills([])
 				setOrchestrationRootId(data.rootAgentId)
 			} else {
 				setOperations(data.operations)
 				setModelName(data.modelName ?? null)
+				setUsedSkills(data.usedSkills)
 				setOrchestrationRootId(null)
 			}
 		} catch (requestError) {
 			setOperations(null)
 			setModelName(null)
+			setUsedSkills([])
 			setOrchestrationRootId(null)
 			setError(requestError instanceof Error ? requestError.message : 'Failed to generate Cerebrus operations.')
 		} finally {
@@ -75,6 +79,7 @@ export function CerebrusPlayground() {
 					<strong>Cerebrus</strong>
 				</div>
 				{modelName ? <span>{modelName}</span> : null}
+				{usedSkills.length > 0 ? <span>{usedSkills.join(', ')}</span> : null}
 			</div>
 			<form className="cerebrus-playground-form" onSubmit={handleSubmit}>
 				<textarea
@@ -103,6 +108,9 @@ export function CerebrusPlayground() {
 					<div className="cerebrus-playground-result">
 						Applied as create/patch operations on Cerebrus shapes on the canvas.
 					</div>
+					{usedSkills.length > 0 ? (
+						<div className="cerebrus-playground-result">Loaded skills: {usedSkills.join(', ')}</div>
+					) : null}
 					<details className="cerebrus-playground-json">
 						<summary>Operations JSON</summary>
 						<pre>{prettyOperations}</pre>
